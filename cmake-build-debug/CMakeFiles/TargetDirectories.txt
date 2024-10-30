@@ -1,0 +1,3 @@
+D:/Github/tinyembed/cmake-build-debug/CMakeFiles/tinyembed.dir
+D:/Github/tinyembed/cmake-build-debug/CMakeFiles/edit_cache.dir
+D:/Github/tinyembed/cmake-build-debug/CMakeFiles/rebuild_cache.dir
