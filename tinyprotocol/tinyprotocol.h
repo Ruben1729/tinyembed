@@ -33,19 +33,19 @@ const static uint8_t crc_lookup_table[256] = {
         0xD8, 0xF7, 0x86, 0xA9, 0x64, 0x4B, 0x3A, 0x15, 0x8F, 0xA0, 0xD1, 0xFE, 0x33, 0x1C, 0x6D, 0x42 };
 
 
-struct tinyprotocol_config{
-    int16_t (*process_tc)(uint8_t command, const uint8_t* buffer, uint8_t size);
-    int16_t (*write_buf)(const uint8_t* buffer, uint8_t size);
+struct TINYPROTOCOL_Config{
+    int16_t (*TINYPROTOCOL_ProcessTelecommand)(uint8_t command, const uint8_t* buffer, uint8_t size);
+    int16_t (*TINYPROTOCOL_WriteBuffer)(const uint8_t* buffer, uint8_t size);
 };
 
-int16_t tproto_byte_rx(const struct tinyprotocol_config *cfg, uint8_t byte);
+int16_t TINYPROTOCOL_ParseByte(const struct TINYPROTOCOL_Config *cfg, uint8_t byte);
 
-int16_t tproto_tc_register(uint8_t command, uint8_t size);
-int16_t tproto_tc_send(const struct tinyprotocol_config *cfg, uint8_t tlcmd, const uint8_t* buffer, uint8_t size);
+int16_t TINYPROTOCOL_RegisterTelecommand(uint8_t command, uint8_t size);
+int16_t TINYPROTOCOL_SendTelecommand(const struct TINYPROTOCOL_Config *cfg, uint8_t tlcmd, const uint8_t* buffer, uint8_t size);
 
-int16_t tproto_tlm_register_channel(uint8_t tlm_channel, const uint8_t* ptr, uint8_t size);
-int16_t tproto_tlm_send_req(const struct tinyprotocol_config *cfg, uint8_t tlm_req);
-int16_t tproto_tlm_read_next();
+int16_t TINYPROTOCOL_RegisterTelemetryChannel(uint8_t tlm_channel, const uint8_t* ptr, uint8_t size);
+int16_t TINYPROTOCOL_SendTelemetryRequest(const struct TINYPROTOCOL_Config *cfg, uint8_t tlm_req);
+int16_t TINYPROTOCOL_ReadNextTelemetryByte(uint8_t *byte);
 
 typedef enum {
     TINYPROTOCOL_FSM_IDLE,

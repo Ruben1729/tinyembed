@@ -16,6 +16,8 @@ static uint8_t tlcmd_current = 0;
 static uint8_t rx_buffer[TINYPROTOCOL_RX_BUFF_SIZE] = {0};
 tinyprotocol_rx_fsm current_state = TINYPROTOCOL_FSM_IDLE;
 
+static uint8_t tc_send_buffer_tmp[TINYPROTOCOL_MAX_PACKET_SIZE] = {0};
+
 uint8_t calculate_crc(const uint8_t* buffer, uint8_t buffer_size) {
     uint8_t crc = crc_init_value;
 
@@ -25,7 +27,7 @@ uint8_t calculate_crc(const uint8_t* buffer, uint8_t buffer_size) {
     return crc ^ crc_xor_value;
 }
 
-int16_t tproto_byte_rx(const struct tinyprotocol_config *cfg, uint8_t byte) {
+int16_t TINYPROTOCOL_ParseByte(const struct TINYPROTOCOL_Config *cfg, uint8_t byte) {
     switch(current_state) {
         case TINYPROTOCOL_FSM_IDLE:
             if ((byte & 0x80) != 0) {
@@ -51,7 +53,7 @@ int16_t tproto_byte_rx(const struct tinyprotocol_config *cfg, uint8_t byte) {
         case TINYPROTOCOL_FSM_TC_RECEIVED:
             if (tlcmd_buffer_idx == tc_size[tlcmd_current] - 1) {
                 if (calculate_crc(rx_buffer, tc_size[tlcmd_current]) == byte) {
-                    cfg->process_tc(rx_buffer[0], &rx_buffer[1], tc_size[tlcmd_current] - 2);
+                    cfg->TINYPROTOCOL_ProcessTelecommand(rx_buffer[0], &rx_buffer[1], tc_size[tlcmd_current] - 2);
                 }
             } else {
                 rx_buffer[tlcmd_buffer_idx ++] = byte;
@@ -63,7 +65,29 @@ int16_t tproto_byte_rx(const struct tinyprotocol_config *cfg, uint8_t byte) {
     return ETINYPROTOCOL_SUCCESS;
 }
 
-int16_t tproto_tlm_register_channel(uint8_t tlm_channel, const uint8_t* ptr, uint8_t size) {
+int16_t TINYPROTOCOL_RegisterTelecommand(uint8_t cmd, uint8_t size) {
+    if(tc_size[cmd] > 0)
+        return -ETINYPROTOCOL_TC_USED;
+
+    tc_size[cmd] = size;
+    return ETINYPROTOCOL_SUCCESS;
+}
+
+int16_t TINYPROTOCOL_SendTelecommand(const struct TINYPROTOCOL_Config *cfg, uint8_t command, const uint8_t* buffer, uint8_t size) {
+    if (size > TINYPROTOCOL_MAX_PACKET_SIZE - 2)
+        return -ETINYPROTOCOL_OVERFLOW;
+
+    tc_send_buffer_tmp[0] = command;
+
+    for(uint8_t i = 0; i < size; i ++) {
+        tc_send_buffer_tmp[i+1] = buffer[i];
+    }
+
+    tc_send_buffer_tmp[size + 1] = calculate_crc(tc_send_buffer_tmp, size + 1);
+    return cfg->TINYPROTOCOL_WriteBuffer(tc_send_buffer_tmp, size + 2);;
+}
+
+int16_t TINYPROTOCOL_RegisterTelemetryChannel(uint8_t tlm_channel, const uint8_t* ptr, uint8_t size) {
     if (tlm_channel > TINYPROTOCOL_MAX_CMD_NUM)
         return -ETINYPROTOCOL_TLM_INVALID_CHANNEL;
 
@@ -76,15 +100,7 @@ int16_t tproto_tlm_register_channel(uint8_t tlm_channel, const uint8_t* ptr, uin
     return ETINYPROTOCOL_SUCCESS;
 }
 
-int16_t tc_register(uint8_t cmd, uint8_t size) {
-    if(tc_size[cmd] > 0)
-        return -ETINYPROTOCOL_TC_USED;
-
-    tc_size[cmd] = size;
-    return ETINYPROTOCOL_SUCCESS;
-}
-
-int16_t tproto_tlm_send_req(const struct tinyprotocol_config *cfg, uint8_t tlm_req) {
+int16_t TINYPROTOCOL_SendTelemetryRequest(const struct TINYPROTOCOL_Config *cfg, uint8_t tlm_req) {
     // Telemetry requests must have the most significant bit set to 1.s
     tlm_req |= 0x80;
 
@@ -92,31 +108,16 @@ int16_t tproto_tlm_send_req(const struct tinyprotocol_config *cfg, uint8_t tlm_r
     uint8_t crc = calculate_crc(&tlm_req, 1);
     uint8_t buf[2] = {tlm_req, crc};
 
-    return cfg->write_buf(buf, 2);
+    return cfg->TINYPROTOCOL_WriteBuffer(buf, 2);
 }
 
-int16_t tproto_tlm_read_next() {
+int16_t TINYPROTOCOL_ReadNextTelemetryByte(uint8_t *byte) {
     if(tlm_current_channel > TINYPROTOCOL_MAX_CMD_NUM)
         return -ETINYPROTOCOL_TLM_INVALID_CHANNEL;
 
     if (tlm_buffer_idx >= tlm_pointer_size[tlm_current_channel])
         return -ETINYPROTOCOL_OVERFLOW;
 
-    return tlm_pointer[tlm_current_channel][tlm_buffer_idx++];
-}
-
-static uint8_t tc_send_buffer_tmp[TINYPROTOCOL_MAX_PACKET_SIZE] = {0};
-
-int16_t tc_send(const struct tinyprotocol_config *cfg, uint8_t command, const uint8_t* buffer, uint8_t size) {
-    if (size > TINYPROTOCOL_MAX_PACKET_SIZE - 2)
-        return -ETINYPROTOCOL_OVERFLOW;
-
-    tc_send_buffer_tmp[0] = command;
-
-    for(uint8_t i = 0; i < size; i ++) {
-        tc_send_buffer_tmp[i+1] = buffer[i];
-    }
-
-    tc_send_buffer_tmp[size + 1] = calculate_crc(tc_send_buffer_tmp, size + 1);
-    return cfg->write_buf(tc_send_buffer_tmp, size + 2);;
+    *byte = tlm_pointer[tlm_current_channel][tlm_buffer_idx++];
+    return ETINYPROTOCOL_SUCCESS;
 }
