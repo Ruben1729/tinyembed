@@ -32,40 +32,68 @@ const static uint8_t crc_lookup_table[256] = {
         0x76, 0x59, 0x28, 0x07, 0xCA, 0xE5, 0x94, 0xBB, 0x21, 0x0E, 0x7F, 0x50, 0x9D, 0xB2, 0xC3, 0xEC,
         0xD8, 0xF7, 0x86, 0xA9, 0x64, 0x4B, 0x3A, 0x15, 0x8F, 0xA0, 0xD1, 0xFE, 0x33, 0x1C, 0x6D, 0x42 };
 
-
 struct TINYPROTOCOL_Config{
     int16_t (*TINYPROTOCOL_ProcessTelecommand)(uint8_t command, const uint8_t* buffer, uint8_t size);
+    int16_t (*TINYPROTOCOL_ProcessTelemetryRequest)();
     int16_t (*TINYPROTOCOL_WriteBuffer)(const uint8_t* buffer, uint8_t size);
 };
 
+int16_t TINYPROTOCOL_Initialize();
+
+uint8_t TINYPROTOCOL_CalculateCRC(const uint8_t* buffer, uint8_t buffer_size);
 int16_t TINYPROTOCOL_ParseByte(const struct TINYPROTOCOL_Config *cfg, uint8_t byte);
 
 int16_t TINYPROTOCOL_RegisterTelecommand(uint8_t command, uint8_t size);
 int16_t TINYPROTOCOL_SendTelecommand(const struct TINYPROTOCOL_Config *cfg, uint8_t tlcmd, const uint8_t* buffer, uint8_t size);
+int16_t TINYPROTOCOL_SendEmptyTelecommand(const struct TINYPROTOCOL_Config *cfg, uint8_t tlcmd);
 
 int16_t TINYPROTOCOL_RegisterTelemetryChannel(uint8_t tlm_channel, const uint8_t* ptr, uint8_t size);
 int16_t TINYPROTOCOL_SendTelemetryRequest(const struct TINYPROTOCOL_Config *cfg, uint8_t tlm_req);
 int16_t TINYPROTOCOL_ReadNextTelemetryByte(uint8_t *byte);
+int16_t TINYPROTOCOL_TelemetryBytesLeft();
 
 typedef enum {
     TINYPROTOCOL_FSM_IDLE,
-    TINYPROTOCOL_FSM_TLM_REQ_RECEIVED,
-    TINYPROTOCOL_FSM_TC_RECEIVED,
-} tinyprotocol_rx_fsm;
+    TINYPROTOCOL_FSM_EXPECT_CMD,
+    TINYPROTOCOL_FSM_EXPECT_TLM_REQ,
+    TINYPROTOCOL_FSM_EXPECT_TC,
+} TINYPROTOCOL_ReceiveFSM;
 
+typedef enum {
+    TLM_ACK_PACKET_RESULT_RECEIVED          = 0,
+    TLM_ACK_PACKET_RESULT_PROCESSING        = 1,
+    TLM_ACK_PACKET_RESULT_COMPLETED         = 2,
+    TLM_ACK_PACKET_RESULT_EOVERFLOW         = 3,
+    TLM_ACK_PACKET_RESULT_EINVALID_CRC      = 4,
+    TLM_ACK_PACKET_RESULT_EINVALID_TLM_REQ  = 5,
+    TLM_ACK_PACKET_RESULT_EINVALID_TC       = 6,
+} TINYPROTOCOL_TlmAckPacketResult;
+
+typedef struct {
+    uint8_t last_command;
+    TINYPROTOCOL_TlmAckPacketResult result;
+} TINYPROTOCOL_TlmAckPacket;
+
+#define TINYPROTOCOL_MAGIC                  0x9b
 #define TINYPROTOCOL_MAX_CMD_NUM            127
+#define TINYPROTOCOL_MAX_PACKET_SIZE        14
+#define TINYPROTOCOL_MAX_PAYLOAD_SIZE       (TINYPROTOCOL_MAX_PACKET_SIZE - 3)
 
+// ERRORS
 #define ETINYPROTOCOL_SUCCESS               0
 #define ETINYPROTOCOL_UNKNOWN               1
 #define ETINYPROTOCOL_OVERFLOW              2
-#define ETINYPROTOCOL_TLM_INVALID_CHANNEL   3
-#define ETINYPROTOCOL_TLM_CHANNEL_USED      4
-#define ETINYPROTOCOL_TC_USED               5
+#define ETINYPROTOCOL_INVALID_CMD_ID        3
+#define ETINYPROTOCOL_CMD_USED              4
+#define ETINYPROTOCOL_INVALID_PAYLOAD_SIZE  5
 
+// COMMAND IDs
+#define TINYPROTOCOL_TC_PING                0
+#define TINYPROTOCOL_TC_RESERVED            1
 #define TINYPROTOCOL_TLM_ACK                0
 #define TINYPROTOCOL_TLM_RESERVED           1
 
+// BUFFER SIZES
 #define TINYPROTOCOL_RX_BUFF_SIZE           127
-#define TINYPROTOCOL_MAX_PACKET_SIZE        14
 
 #endif //TINYEMBED_TINYPROTOCOL_H
