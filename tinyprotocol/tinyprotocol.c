@@ -80,9 +80,9 @@ int16_t TINYPROTOCOL_ParseByte(const struct TINYPROTOCOL_Config *cfg, uint8_t by
             } else {
                 cfg->TINYPROTOCOL_ProcessTelemetryRequest();
                 TlmAckPacket.result = TLM_ACK_PACKET_RESULT_COMPLETED;
-                current_state = TINYPROTOCOL_FSM_IDLE;
             }
 
+            current_state = TINYPROTOCOL_FSM_IDLE;
             break;
         case TINYPROTOCOL_FSM_EXPECT_TC:
             if (tlcmd_buffer_idx == tc_size[tlcmd_current]) {
@@ -161,11 +161,11 @@ int16_t TINYPROTOCOL_RegisterTelemetryChannel(uint8_t tlm_channel, const uint8_t
 }
 
 int16_t TINYPROTOCOL_SendTelemetryRequest(const struct TINYPROTOCOL_Config *cfg, uint8_t tlm_req) {
-    // Telemetry requests must have the most significant bit set to 1.s
-    tlm_req |= 0x80;
-
     // Calculate crc and create buffer with proper content.
     uint8_t crc = TINYPROTOCOL_CalculateCRC(&tlm_req, 1);
+
+    // Telemetry requests must have the most significant bit set to 1.s
+    tlm_req |= 0x80;
     uint8_t buf[3] = {TINYPROTOCOL_MAGIC, tlm_req, crc};
 
     return cfg->TINYPROTOCOL_WriteBuffer(buf, 3);
@@ -186,6 +186,7 @@ int16_t TINYPROTOCOL_ReadNextTelemetryByte(uint8_t *byte) {
 
     if (tlm_buffer_idx == tlm_pointer_size[tlm_current_channel] - 1) {
         *byte = TINYPROTOCOL_CalculateCRC(tlm_pointer[tlm_current_channel], tlm_pointer_size[tlm_current_channel] - 1);
+        tlm_buffer_idx ++;
     } else {
         *byte = tlm_pointer[tlm_current_channel][tlm_buffer_idx++];
     }
